@@ -25,6 +25,7 @@ mod sealed {
     impl KeySize for super::U32 {}
 }
 
+use cipher::BlockSizeUser;
 use sealed::KeySize;
 
 #[derive(Clone, Debug, PartialEq)]
@@ -182,10 +183,11 @@ impl<'a, Size: KeySize> Aes<'a, Size> {
 
 // the `block-cipher` traits
 
-impl<'a, Size: KeySize> BlockCipher for Aes<'a, Size> {
-    type BlockSize = U16;
-    type ParBlocks = U1;
+impl<'a, Size: KeySize> BlockSizeUser for Aes<'a, Size> {
+    type BlockSize = Size;
 }
+
+impl<'a, Size: KeySize> BlockCipher for Aes<'a, Size> {}
 
 impl<'a, Size: KeySize> BlockEncrypt for Aes<'a, Size> {
     fn encrypt_block(&self, block: &mut Block<Self>) {
@@ -194,6 +196,10 @@ impl<'a, Size: KeySize> BlockEncrypt for Aes<'a, Size> {
             self.configure(Mode::Encrypt);
         }
         self.one_block(block);
+    }
+
+    fn encrypt_with_backend(&self, f: impl cipher::BlockClosure<BlockSize = Self::BlockSize>) {
+        todo!()
     }
 }
 
@@ -204,6 +210,10 @@ impl<'a, Size: KeySize> BlockDecrypt for Aes<'a, Size> {
             self.configure(Mode::Decrypt);
         }
         self.one_block(block);
+    }
+
+    fn decrypt_with_backend(&self, f: impl cipher::BlockClosure<BlockSize = Self::BlockSize>) {
+        todo!()
     }
 }
 

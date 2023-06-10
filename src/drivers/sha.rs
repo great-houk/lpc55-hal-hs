@@ -1,7 +1,8 @@
 use core::marker::PhantomData;
 
 use crate::traits::aligned::{Aligned, A4};
-use block_buffer::BlockBuffer;
+use block_buffer::{BlockBuffer, Eager};
+use cipher::BlockSizeUser;
 
 use crate::{
     peripherals::hashcrypt::Hashcrypt,
@@ -10,7 +11,7 @@ use crate::{
             typenum::{U20, U32, U64},
             GenericArray,
         },
-        digest::{BlockInput, FixedOutputDirty, Update /*, Reset*/},
+        digest::Update,
     },
     typestates::init_state::Enabled,
 };
@@ -33,7 +34,7 @@ mod sealed {
 use sealed::OutputSize;
 
 pub struct Sha<'a, Size: OutputSize> {
-    buffer: Aligned<A4, BlockBuffer<BlockSize>>,
+    buffer: Aligned<A4, BlockBuffer<BlockSize, Eager>>,
     inner: &'a mut Hashcrypt<Enabled>,
     len: u64,
     size: PhantomData<Size>,
@@ -88,26 +89,30 @@ impl<'a, Size: OutputSize> From<&'a mut Hashcrypt<Enabled>> for Sha<'a, Size> {
 
 // the `digest` traits
 
-impl<Size: OutputSize> BlockInput for Sha<'_, Size> {
+// impl<Size: OutputSize> BlockInput for Sha<'_, Size> {
+//     type BlockSize = BlockSize;
+// }
+
+impl<Size: OutputSize> BlockSizeUser for Sha<'_, Size> {
     type BlockSize = BlockSize;
 }
 
-impl<Size: OutputSize> FixedOutputDirty for Sha<'_, Size> {
-    type OutputSize = Size;
+// impl<Size: OutputSize> FixedOutputDirty for Sha<'_, Size> {
+//     type OutputSize = Size;
 
-    fn finalize_into_dirty(&mut self, out: &mut GenericArray<u8, Self::OutputSize>) {
-        self.finish();
-        // cf `hashcrypt_get_data` ~line 315 of `fsl_hashcrypt.c`
-        for i in 0..Size::to_usize() / 4 {
-            out.as_mut_slice()[4 * i..4 * i + 4]
-                .copy_from_slice(&self.inner.raw.digest0[i].read().bits().to_be_bytes());
-        }
-    }
-}
+//     fn finalize_into_dirty(&mut self, out: &mut GenericArray<u8, Self::OutputSize>) {
+//         self.finish();
+//         // cf `hashcrypt_get_data` ~line 315 of `fsl_hashcrypt.c`
+//         for i in 0..Size::to_usize() / 4 {
+//             out.as_mut_slice()[4 * i..4 * i + 4]
+//                 .copy_from_slice(&self.inner.raw.digest0[i].read().bits().to_be_bytes());
+//         }
+//     }
+// }
 
 impl<Size: OutputSize> Update for Sha<'_, Size> {
-    fn update(&mut self, data: impl AsRef<[u8]>) {
-        self.update(data.as_ref());
+    fn update(&mut self, data: &[u8]) {
+        self.update(data);
     }
 }
 
@@ -120,15 +125,18 @@ impl<Size: OutputSize> Sha<'_, Size> {
         // need to convince compiler we're using buffer and peripheral
         // independently, and not doing a double &mut
         let peripheral = &mut self.inner;
-        self.buffer
-            .input_block(data, |data| Self::process_block(peripheral, data));
+        self.buffer.digest_blocks(data, |data| {
+            for data in data {
+                Self::process_block(peripheral, data)
+            }
+        });
     }
 
     // relevant code is ~line 800 in fsl_hashcrypt.c
     fn process_block(peripheral: &mut Hashcrypt<Enabled>, input: &GenericArray<u8, BlockSize>) {
         // input must be word-aligned
         let input: Aligned<A4, GenericArray<u8, BlockSize>> = Aligned(input.clone());
-        let addr: u32 = &input.as_ref()[0] as *const _ as _;
+        let addr: u32 = &(input.as_ref() as &[u8])[0] as *const _ as _;
         assert_eq!(addr & 0x3, 0);
         while peripheral.raw.status.read().waiting().is_not_waiting() {
             continue;

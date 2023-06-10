@@ -16,14 +16,14 @@ build = "build.rs"
 targets = []
 
 [dependencies]
-block-buffer = "0.9"
-cipher = "0.3"
+block-buffer = "0.10"
+cipher = "0.4"
 cortex-m = "0.7"
-digest = "0.9"
+digest = "0.10"
 embedded-hal = { version = "0.2", features = ["unproven"] }
 embedded-time = "0.12"
-generic-array = "0.14.2"
-lpc55-pac = "0.4"
+generic-array = "0.14"
+lpc55-pac = "0.5"
 nb = "1"
 rand_core = "0.6"
 usb-device = "0.2"
@@ -36,18 +36,18 @@ lpc55-rtic = { version = "0.5.7", optional = true }
 littlefs2 = { version = "0.4", optional = true }
 
 [dev-dependencies]
-aes = "0.7"
-cortex-m-rt = "0.6"
+aes = "0.8"
+cortex-m-rt = "0.7"
 # cortex-m-rtic = "0.5"
 lpc55-rtic = "0.5"
-cortex-m-semihosting = "0.3"
+cortex-m-semihosting = "0.5"
 heapless = "0.7"
 panic-halt  = "0.2"
-panic-semihosting = { version = "0.5", features = ["jlink-quirks"] }
-rtt-target = { version = "0.3", features = ["cortex-m"] }
-sha2 = { version = "0.9", default-features = false }
-ssd1306 = "0.3"
-sha-1 = { version = "0.9", default-features = false }
+panic-semihosting = { version = "0.6", features = ["jlink-quirks"] }
+rtt-target = { version = "0.4", features = ["cortex-m"] }
+sha2 = { version = "0.10", default-features = false }
+ssd1306 = "0.7"
+sha-1 = { version = "0.10", default-features = false }
 usbd-serial = "0.1"
 
 [features]
