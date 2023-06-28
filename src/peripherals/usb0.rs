@@ -1,20 +1,23 @@
-use crate::peripherals::{anactrl, pmc, syscon};
 use crate::raw;
 use crate::typestates::{
     init_state,
-    usbfs_mode,
+    usb0_mode,
     // ValidUsbClockToken,
     // Fro96MHzEnabledToken,
     ClocksSupportUsbfsToken,
 };
+use crate::{
+    peripherals::{anactrl, pmc, syscon},
+    traits::usb::UsbPeripheral,
+};
 use core::ops::Deref;
 
-use crate::traits::usb::{Usb, UsbSpeed};
+use crate::traits::usb::Usb;
 
 // Main struct
-pub struct Usbfs<
+pub struct Usb0<
     State: init_state::InitState = init_state::Unknown,
-    Mode: usbfs_mode::UsbfsMode = usbfs_mode::Unknown,
+    Mode: usb0_mode::Usb0Mode = usb0_mode::Unknown,
 > {
     pub(crate) raw_fsd: raw::USB0,
     pub(crate) raw_fsh: raw::USBFSH,
@@ -22,35 +25,34 @@ pub struct Usbfs<
     _mode: Mode,
 }
 
-pub type EnabledUsbfsDevice = Usbfs<init_state::Enabled, usbfs_mode::Device>;
-pub type EnabledUsbfsHost = Usbfs<init_state::Enabled, usbfs_mode::Host>;
+pub type EnabledUsbFsDevice = Usb0<init_state::Enabled, usb0_mode::Device>;
+pub type EnabledUsbFsHost = Usb0<init_state::Enabled, usb0_mode::Host>;
 
-impl Deref for EnabledUsbfsDevice {
+impl Deref for EnabledUsbFsDevice {
     type Target = raw::usb1::RegisterBlock;
     fn deref(&self) -> &Self::Target {
         &self.raw_fsd
     }
 }
 
-unsafe impl Sync for EnabledUsbfsDevice {}
+unsafe impl Sync for EnabledUsbFsDevice {}
 
-impl Usb<init_state::Enabled> for EnabledUsbfsDevice {
-    const SPEED: UsbSpeed = UsbSpeed::FullSpeed;
-    // const NUM_ENDPOINTS: usize = 1 + 5;
+impl Usb<init_state::Enabled> for EnabledUsbFsDevice {
+    const USB: UsbPeripheral = UsbPeripheral::USB0;
 }
 
-impl Usbfs {
+impl Usb0 {
     pub fn new(raw_fsd: raw::USB0, raw_fsh: raw::USBFSH) -> Self {
-        Usbfs {
+        Usb0 {
             raw_fsd,
             raw_fsh,
             _state: init_state::Unknown,
-            _mode: usbfs_mode::Unknown,
+            _mode: usb0_mode::Unknown,
         }
     }
 }
 
-impl<State: init_state::InitState, Mode: usbfs_mode::UsbfsMode> Usbfs<State, Mode> {
+impl<State: init_state::InitState, Mode: usb0_mode::Usb0Mode> Usb0<State, Mode> {
     pub fn release(self) -> (raw::USB0, raw::USBFSH) {
         (self.raw_fsd, self.raw_fsh)
     }
@@ -62,7 +64,7 @@ impl<State: init_state::InitState, Mode: usbfs_mode::UsbfsMode> Usbfs<State, Mod
         syscon: &mut syscon::Syscon,
         // lock_fro_to_sof: bool, // we always lock to SOF
         _clocks_token: ClocksSupportUsbfsToken,
-    ) -> EnabledUsbfsDevice {
+    ) -> EnabledUsbFsDevice {
         // Configure clock input: Fro96MHz divided by 2 = 48MHz
         // TODO: disable this again in `self.disable`.
         unsafe { syscon.raw.usb0clkdiv.modify(|_, w| w.div().bits(1)) };
@@ -100,11 +102,11 @@ impl<State: init_state::InitState, Mode: usbfs_mode::UsbfsMode> Usbfs<State, Mod
         while anactrl.raw.fro192m_ctrl.read().usbmodchg().bit_is_set() {}
         // }
 
-        Usbfs {
+        Usb0 {
             raw_fsd: self.raw_fsd,
             raw_fsh: self.raw_fsh,
             _state: init_state::Enabled(()),
-            _mode: usbfs_mode::Device,
+            _mode: usb0_mode::Device,
         }
     }
 }
@@ -117,7 +119,7 @@ pub struct UsbFsDevInfo {
     frame_nr: u16,
 }
 
-impl EnabledUsbfsDevice {
+impl EnabledUsbFsDevice {
     pub fn info(&self) -> UsbFsDevInfo {
         // technically, e.g. maj/min rev need only the clock, and not the power enabled
         UsbFsDevInfo {
@@ -129,27 +131,27 @@ impl EnabledUsbfsDevice {
     }
 }
 
-impl<State: init_state::InitState> Usbfs<State, usbfs_mode::Device> {
+impl<State: init_state::InitState> Usb0<State, usb0_mode::Device> {
     /// Disables the USB FS peripheral, assumed in device mode
     pub fn disabled(
         mut self,
         pmc: &mut pmc::Pmc,
         syscon: &mut syscon::Syscon,
-    ) -> Usbfs<init_state::Disabled, usbfs_mode::Device> {
+    ) -> Usb0<init_state::Disabled, usb0_mode::Device> {
         pmc.power_off(&mut self.raw_fsd);
         syscon.disable_clock(&mut self.raw_fsd);
 
-        Usbfs {
+        Usb0 {
             raw_fsd: self.raw_fsd,
             raw_fsh: self.raw_fsh,
             _state: init_state::Disabled,
-            _mode: usbfs_mode::Device,
+            _mode: usb0_mode::Device,
         }
     }
 }
 
-impl From<(raw::USB0, raw::USBFSH)> for Usbfs {
+impl From<(raw::USB0, raw::USBFSH)> for Usb0 {
     fn from(raw: (raw::USB0, raw::USBFSH)) -> Self {
-        Usbfs::new(raw.0, raw.1)
+        Usb0::new(raw.0, raw.1)
     }
 }

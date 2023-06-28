@@ -50,30 +50,30 @@ pub mod main_clock {
     // impl MainClock for Fro96Mhz {}
 }
 
-pub mod usbfs_mode {
-    pub trait UsbfsMode {}
+pub mod usb0_mode {
+    pub trait Usb0Mode {}
 
     pub struct Unknown;
-    impl UsbfsMode for Unknown {}
+    impl Usb0Mode for Unknown {}
 
     pub struct Device;
-    impl UsbfsMode for Device {}
+    impl Usb0Mode for Device {}
 
     pub struct Host;
-    impl UsbfsMode for Host {}
+    impl Usb0Mode for Host {}
 }
 
-pub mod usbhs_mode {
-    pub trait UsbhsMode {}
+pub mod usb1_mode {
+    pub trait Usb1Mode {}
 
     pub struct Unknown;
-    impl UsbhsMode for Unknown {}
+    impl Usb1Mode for Unknown {}
 
     pub struct Device;
-    impl UsbhsMode for Device {}
+    impl Usb1Mode for Device {}
 
     pub struct Host;
-    impl UsbhsMode for Host {}
+    impl Usb1Mode for Host {}
 }
 
 /// Application can only obtain this token from

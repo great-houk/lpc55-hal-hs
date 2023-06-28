@@ -53,7 +53,7 @@ pub use peripherals::{
     adc::Adc, anactrl::Anactrl, casper::Casper, ctimer::Ctimers, dma::Dma, flash::Flash,
     flexcomm::Flexcomm, gint::Gint, gpio::Gpio, hashcrypt::Hashcrypt, inputmux::InputMux,
     iocon::Iocon, pfr::Pfr, pint::Pint, pmc::Pmc, prince::Prince, puf::Puf, rng::Rng, rtc::Rtc,
-    syscon::Syscon, usbfs::Usbfs, usbhs::Usbhs, utick::Utick,
+    syscon::Syscon, usb0::Usb0, usb1::Usb1, utick::Utick,
 };
 
 pub mod drivers;
@@ -149,10 +149,10 @@ pub struct Peripherals {
     pub syscon: Syscon,
 
     /// USB full-speed device or, not implemented, host
-    pub usbfs: Usbfs,
+    pub usbfs: Usb0,
 
     /// USB high-speed device or, not implemented, host
-    pub usbhs: Usbhs,
+    pub usbhs: Usb1,
 
     /// Micro-Tick Timer
     pub utick: Utick,
@@ -287,8 +287,8 @@ impl From<(raw::Peripherals, rtic::Peripherals)> for Peripherals {
             rng: Rng::from(p.RNG),
             rtc: Rtc::from(p.RTC),
             syscon: Syscon::from(p.SYSCON),
-            usbfs: Usbfs::from((p.USB0, p.USBFSH)),
-            usbhs: Usbhs::from((p.USBPHY, p.USB1, p.USBHSH)),
+            usbfs: Usb0::from((p.USB0, p.USBFSH)),
+            usbhs: Usb1::from((p.USBPHY, p.USB1, p.USBHSH)),
             utick: Utick::from(p.UTICK0),
 
             // Raw peripherals
@@ -401,8 +401,8 @@ impl From<(raw::Peripherals, raw::CorePeripherals)> for Peripherals {
             rng: Rng::from(p.RNG),
             rtc: Rtc::from(p.RTC),
             syscon: Syscon::from(p.SYSCON),
-            usbfs: Usbfs::from((p.USB0, p.USBFSH)),
-            usbhs: Usbhs::from((p.USBPHY, p.USB1, p.USBHSH)),
+            usbfs: Usb0::from((p.USB0, p.USBFSH)),
+            usbhs: Usb1::from((p.USBPHY, p.USB1, p.USBHSH)),
             utick: Utick::from(p.UTICK0),
 
             // Raw peripherals

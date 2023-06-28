@@ -1,5 +1,5 @@
 use super::constants::{EP_MEM_ADDR, NUM_ENDPOINTS};
-use crate::traits::usb::UsbSpeed;
+use crate::traits::usb::UsbPeripheral;
 use core::marker::PhantomData;
 
 static mut ENDPOINT_REGISTERS_ATTACHED: bool = false;
@@ -107,7 +107,7 @@ pub unsafe fn steal() -> Instance {
 // }
 
 pub mod epr {
-    use super::UsbSpeed;
+    use super::UsbPeripheral;
     use crate::traits::usb::Usb;
     use crate::typestates::init_state;
 
@@ -120,10 +120,10 @@ pub mod epr {
         offset: u32,
     }
 
-    impl From<UsbSpeed> for NbytesField {
-        fn from(speed: UsbSpeed) -> Self {
+    impl From<UsbPeripheral> for NbytesField {
+        fn from(speed: UsbPeripheral) -> Self {
             match speed {
-                UsbSpeed::FullSpeed => {
+                UsbPeripheral::USB0 => {
                     const MASK: u32 = (1 << 10) - 1;
                     const OFFSET: u32 = 16;
                     NbytesField {
@@ -131,7 +131,7 @@ pub mod epr {
                         offset: OFFSET,
                     }
                 }
-                UsbSpeed::HighSpeed => {
+                UsbPeripheral::USB1 => {
                     const MASK: u32 = (1 << 15) - 1;
                     const OFFSET: u32 = 11;
                     NbytesField {
@@ -143,10 +143,10 @@ pub mod epr {
         }
     }
 
-    impl From<UsbSpeed> for AddrOffField {
-        fn from(speed: UsbSpeed) -> Self {
+    impl From<UsbPeripheral> for AddrOffField {
+        fn from(speed: UsbPeripheral) -> Self {
             match speed {
-                UsbSpeed::FullSpeed => {
+                UsbPeripheral::USB0 => {
                     const MASK: u32 = 0xffff;
                     const OFFSET: u32 = 0;
                     AddrOffField {
@@ -154,7 +154,7 @@ pub mod epr {
                         offset: OFFSET,
                     }
                 }
-                UsbSpeed::HighSpeed => {
+                UsbPeripheral::USB1 => {
                     const MASK: u32 = (1 << 11) - 1;
                     const OFFSET: u32 = 0;
                     AddrOffField {
@@ -593,7 +593,7 @@ pub mod epr {
         #[doc = "Bits 0:15 - Endpoint buffer address offset for full speed, or bits 0:10 for high speed"]
         #[inline]
         pub fn addroff<USB: Usb<init_state::Enabled>>(&self) -> ADDROFFR {
-            let field = AddrOffField::from(USB::SPEED);
+            let field = AddrOffField::from(USB::USB);
             ADDROFFR {
                 bits: ((self.bits >> field.offset) & field.mask as u32) as u16,
             }
@@ -601,7 +601,7 @@ pub mod epr {
         #[doc = "Bits 16:25 - Endpoint buffer NBytes while in full speed operation, or bits 11:25 for high speed operation."]
         #[inline]
         pub fn nbytes<USB: Usb<init_state::Enabled>>(&self) -> NBYTESR {
-            let field = NbytesField::from(USB::SPEED);
+            let field = NbytesField::from(USB::USB);
             NBYTESR {
                 bits: ((self.bits >> field.offset) & field.mask as u32) as u16,
             }
@@ -681,7 +681,7 @@ pub mod epr {
         pub fn addroff<USB: Usb<init_state::Enabled>>(&mut self) -> _ADDROFFW {
             _ADDROFFW {
                 w: self,
-                field: AddrOffField::from(USB::SPEED),
+                field: AddrOffField::from(USB::USB),
             }
         }
         #[doc = "Bits 16:25 - Endpoint buffer NBytes for full speed, or bits 25:11 for high speed"]
@@ -689,7 +689,7 @@ pub mod epr {
         pub fn nbytes<USB: Usb<init_state::Enabled>>(&mut self) -> _NBYTESW {
             _NBYTESW {
                 w: self,
-                field: NbytesField::from(USB::SPEED),
+                field: NbytesField::from(USB::USB),
             }
         }
         #[doc = "Bit 26 - Endpoint type"]

@@ -1,24 +1,23 @@
 use core::ops::Deref;
 use embedded_time::duration::Extensions;
 
-use crate::drivers::timer;
 use crate::peripherals::{anactrl, ctimer, pmc, syscon};
 use crate::raw;
+use crate::traits::usb::Usb;
 use crate::traits::wg::timer::CountDown;
 use crate::typestates::{
     init_state,
-    usbhs_mode,
+    usb1_mode,
     // ValidUsbClockToken,
     // Fro96MHzEnabledToken,
     ClocksSupportUsbhsToken,
 };
-
-use crate::traits::usb::{Usb, UsbSpeed};
+use crate::{drivers::timer, traits::usb::UsbPeripheral};
 
 // Main struct
-pub struct Usbhs<
+pub struct Usb1<
     State: init_state::InitState = init_state::Unknown,
-    Mode: usbhs_mode::UsbhsMode = usbhs_mode::Unknown,
+    Mode: usb1_mode::Usb1Mode = usb1_mode::Unknown,
 > {
     pub(crate) raw_phy: raw::USBPHY,
     pub(crate) raw_hsd: raw::USB1,
@@ -27,36 +26,35 @@ pub struct Usbhs<
     _mode: Mode,
 }
 
-pub type EnabledUsbhsDevice = Usbhs<init_state::Enabled, usbhs_mode::Device>;
-pub type EnabledUsbhsHost = Usbhs<init_state::Enabled, usbhs_mode::Host>;
+pub type EnabledUsbDevice = Usb1<init_state::Enabled, usb1_mode::Device>;
+pub type EnabledUsbHost = Usb1<init_state::Enabled, usb1_mode::Host>;
 
-impl Deref for EnabledUsbhsDevice {
+impl Deref for EnabledUsbDevice {
     type Target = raw::usb1::RegisterBlock;
     fn deref(&self) -> &Self::Target {
         &self.raw_hsd
     }
 }
 
-unsafe impl Sync for EnabledUsbhsDevice {}
+unsafe impl Sync for EnabledUsbDevice {}
 
-impl Usb<init_state::Enabled> for EnabledUsbhsDevice {
-    const SPEED: UsbSpeed = UsbSpeed::HighSpeed;
-    // const NUM_ENDPOINTS: usize = 1 + 5;
+impl Usb<init_state::Enabled> for EnabledUsbDevice {
+    const USB: UsbPeripheral = UsbPeripheral::USB1;
 }
 
-impl Usbhs {
+impl Usb1 {
     pub fn new(raw_phy: raw::USBPHY, raw_hsd: raw::USB1, raw_hsh: raw::USBHSH) -> Self {
-        Usbhs {
+        Usb1 {
             raw_phy,
             raw_hsd,
             raw_hsh,
             _state: init_state::Unknown,
-            _mode: usbhs_mode::Unknown,
+            _mode: usb1_mode::Unknown,
         }
     }
 }
 
-impl<State: init_state::InitState, Mode: usbhs_mode::UsbhsMode> Usbhs<State, Mode> {
+impl<State: init_state::InitState, Mode: usb1_mode::Usb1Mode> Usb1<State, Mode> {
     pub fn release(self) -> (raw::USB1, raw::USBHSH) {
         (self.raw_hsd, self.raw_hsh)
     }
@@ -69,7 +67,7 @@ impl<State: init_state::InitState, Mode: usbhs_mode::UsbhsMode> Usbhs<State, Mod
         timer: &mut timer::Timer<impl ctimer::Ctimer<init_state::Enabled>>,
         // lock_fro_to_sof: bool, // we always lock to SOF
         _clocks_token: ClocksSupportUsbhsToken,
-    ) -> EnabledUsbhsDevice {
+    ) -> EnabledUsbDevice {
         // Reset devices
         syscon.reset(&mut self.raw_hsh);
         syscon.reset(&mut self.raw_hsd);
@@ -142,12 +140,12 @@ impl<State: init_state::InitState, Mode: usbhs_mode::UsbhsMode> Usbhs<State, Mod
         // turn on USB1 device controller access
         syscon.enable_clock(&mut self.raw_hsd);
 
-        Usbhs {
+        Usb1 {
             raw_phy: self.raw_phy,
             raw_hsd: self.raw_hsd,
             raw_hsh: self.raw_hsh,
             _state: init_state::Enabled(()),
-            _mode: usbhs_mode::Device,
+            _mode: usb1_mode::Device,
         }
     }
 
@@ -157,17 +155,17 @@ impl<State: init_state::InitState, Mode: usbhs_mode::UsbhsMode> Usbhs<State, Mod
 }
 
 #[derive(Debug)]
-pub struct UsbHsDevInfo {
+pub struct Usb1DevInfo {
     maj_rev: u8,
     min_rev: u8,
     err_code: u8,
     frame_nr: u16,
 }
 
-impl EnabledUsbhsDevice {
-    pub fn info(&self) -> UsbHsDevInfo {
+impl EnabledUsbDevice {
+    pub fn info(&self) -> Usb1DevInfo {
         // technically, e.g. maj/min rev need only the clock, and not the power enabled
-        UsbHsDevInfo {
+        Usb1DevInfo {
             maj_rev: self.raw_hsd.info.read().majrev().bits(),
             min_rev: self.raw_hsd.info.read().minrev().bits(),
             err_code: self.raw_hsd.info.read().err_code().bits(),
@@ -184,13 +182,13 @@ impl EnabledUsbhsDevice {
     }
 }
 
-impl<State: init_state::InitState> Usbhs<State, usbhs_mode::Device> {
+impl<State: init_state::InitState> Usb1<State, usb1_mode::Device> {
     /// Disables the USB HS peripheral, assumed in device mode
     pub fn disabled(
         mut self,
         pmc: &mut pmc::Pmc,
         syscon: &mut syscon::Syscon,
-    ) -> Usbhs<init_state::Disabled, usbhs_mode::Device> {
+    ) -> Usb1<init_state::Disabled, usb1_mode::Device> {
         syscon.disable_clock(&mut self.raw_hsd);
 
         syscon.disable_clock(&mut self.raw_phy);
@@ -204,18 +202,18 @@ impl<State: init_state::InitState> Usbhs<State, usbhs_mode::Device> {
             .pdruncfg0
             .modify(|_, w| w.pden_ldoxo32m().poweredoff());
 
-        Usbhs {
+        Usb1 {
             raw_phy: self.raw_phy,
             raw_hsd: self.raw_hsd,
             raw_hsh: self.raw_hsh,
             _state: init_state::Disabled,
-            _mode: usbhs_mode::Device,
+            _mode: usb1_mode::Device,
         }
     }
 }
 
-impl From<(raw::USBPHY, raw::USB1, raw::USBHSH)> for Usbhs {
+impl From<(raw::USBPHY, raw::USB1, raw::USBHSH)> for Usb1 {
     fn from(raw: (raw::USBPHY, raw::USB1, raw::USBHSH)) -> Self {
-        Usbhs::new(raw.0, raw.1, raw.2)
+        Usb1::new(raw.0, raw.1, raw.2)
     }
 }
